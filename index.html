@@ -1,1 +1,1284 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameVault - Votre Ludothèque Personnelle PWA</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gaming: {
+                            50: '#f0f4ff',
+                            100: '#e0e9fe',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#1e1b4b',
+                            900: '#0f172a',
+                            accent: '#10b981',
+                            neon: '#8b5cf6',
+                            pink: '#ec4899'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- QuaggaJS / HTML5-QRCode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        /* Glassmorphism Effect */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.25s ease-in-out;
+        }
+        .glass-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.25);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+        /* Scanner Laser Line Animation */
+        @keyframes scanLaser {
+            0% { top: 10%; opacity: 0.8; }
+            50% { top: 85%; opacity: 1; }
+            100% { top: 10%; opacity: 0.8; }
+        }
+        .laser-line {
+            position: absolute;
+            width: 90%;
+            left: 5%;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(236,72,153,0) 0%, rgba(236,72,153,1) 50%, rgba(236,72,153,0) 100%);
+            box-shadow: 0 0 15px #ec4899, 0 0 5px #ec4899;
+            animation: scanLaser 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 md:pb-0 md:pl-64">
 
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Sidebar / Navigation Deskop -->
+    <aside class="hidden md:flex fixed left-0 top-0 h-full w-64 glass-panel flex-col z-40 border-r border-slate-800">
+        <div class="p-6 flex items-center gap-3 border-b border-slate-800/60">
+            <div class="bg-gradient-to-tr from-indigo-600 to-pink-500 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid font-black fa-gamepad text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">GameVault</h1>
+                <p class="text-xs text-slate-400">Gestionnaire de Jeux PWA</p>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+            <button onclick="switchTab('collection')" id="nav-collection" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-indigo-400 bg-indigo-500/10 border border-indigo-500/20">
+                <i class="fa-solid fa-layer-group text-lg"></i> Ma Collection
+                <span id="badge-count" class="ml-auto text-xs bg-indigo-600 text-white font-bold px-2 py-0.5 rounded-full">0</span>
+            </button>
+            <button onclick="switchTab('explore')" id="nav-explore" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition">
+                <i class="fa-solid fa-magnifying-glass text-lg"></i> Explorer & Ajouter
+            </button>
+            <button onclick="switchTab('scanner')" id="nav-scanner" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition">
+                <i class="fa-solid fa-barcode text-lg"></i> Scanner Code EAN
+            </button>
+            <button onclick="switchTab('stats')" id="nav-stats" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition">
+                <i class="fa-solid fa-chart-pie text-lg"></i> Statistiques
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition">
+                <i class="fa-solid fa-sliders text-lg"></i> Paramètres & PWA
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800/60">
+            <div id="pwa-install-banner" class="glass-card p-3 rounded-xl border border-indigo-500/30 text-center">
+                <i class="fa-solid fa-mobile-screen-button text-indigo-400 text-2xl mb-2"></i>
+                <p class="text-xs font-semibold text-slate-200 mb-2">Installer l'application PWA</p>
+                <button onclick="installPWA()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition shadow-md">
+                    Installer GameVault
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Bottom Navigation for Mobile -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 glass-panel border-t border-slate-800 z-40 flex justify-around p-2">
+        <button onclick="switchTab('collection')" id="mobile-nav-collection" class="mobile-nav-btn flex flex-col items-center p-2 text-indigo-400">
+            <i class="fa-solid fa-layer-group text-lg"></i>
+            <span class="text-[10px] mt-1 font-medium">Ludothèque</span>
+        </button>
+        <button onclick="switchTab('explore')" id="mobile-nav-explore" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400">
+            <i class="fa-solid fa-magnifying-glass text-lg"></i>
+            <span class="text-[10px] mt-1 font-medium">Recherche</span>
+        </button>
+        <button onclick="switchTab('scanner')" id="mobile-nav-scanner" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 relative">
+            <div class="bg-indigo-600 text-white p-3 rounded-full -mt-6 shadow-lg shadow-indigo-500/50 border-2 border-slate-900">
+                <i class="fa-solid fa-barcode text-xl"></i>
+            </div>
+            <span class="text-[10px] mt-1 font-medium">Scanner</span>
+        </button>
+        <button onclick="switchTab('stats')" id="mobile-nav-stats" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400">
+            <i class="fa-solid fa-chart-pie text-lg"></i>
+            <span class="text-[10px] mt-1 font-medium">Stats</span>
+        </button>
+        <button onclick="switchTab('settings')" id="mobile-nav-settings" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400">
+            <i class="fa-solid fa-gear text-lg"></i>
+            <span class="text-[10px] mt-1 font-medium">Plus</span>
+        </button>
+    </nav>
+
+    <!-- Top Mobile Header -->
+    <header class="md:hidden glass-panel sticky top-0 z-30 p-4 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-2">
+            <div class="bg-gradient-to-tr from-indigo-600 to-pink-500 p-2 rounded-lg text-white">
+                <i class="fa-solid fa-gamepad text-base"></i>
+            </div>
+            <h1 class="font-extrabold text-lg text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400">GameVault</h1>
+        </div>
+        <button onclick="installPWA()" class="bg-slate-800 hover:bg-slate-700 text-xs text-indigo-400 border border-indigo-500/30 font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-download"></i> PWA
+        </button>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
+
+        <!-- SECTION 1: MA COLLECTION -->
+        <section id="tab-collection" class="tab-content block space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Ma Collection de Jeux</h2>
+                    <p class="text-slate-400 text-sm mt-1">Gérez et organisez vos titres physiques et numériques.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="switchTab('explore')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-medium text-sm transition flex items-center gap-2 shadow-lg shadow-indigo-600/30">
+                        <i class="fa-solid fa-plus"></i> Ajouter un jeu
+                    </button>
+                    <button onclick="switchTab('scanner')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2 rounded-xl font-medium text-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-barcode"></i> Scan EAN
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters Bar -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-wrap gap-3 items-center justify-between">
+                <div class="relative flex-1 min-w-[200px]">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="collection-search" oninput="filterCollection()" placeholder="Filtrer dans ma collection..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                </div>
+                <div class="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <select id="filter-platform" onchange="filterCollection()" class="bg-slate-900/80 border border-slate-700/80 text-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="ALL">Toutes plateformes</option>
+                        <option value="PS5">PlayStation 5</option>
+                        <option value="PS4">PlayStation 4</option>
+                        <option value="Nintendo Switch">Nintendo Switch</option>
+                        <option value="Xbox Series X/S">Xbox Series X/S</option>
+                        <option value="PC">PC</option>
+                        <option value="Retro">Rétrogaming</option>
+                    </select>
+                    <select id="filter-status" onchange="filterCollection()" class="bg-slate-900/80 border border-slate-700/80 text-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="ALL">Tous les statuts</option>
+                        <option value="Possédé">Possédé</option>
+                        <option value="En cours">En cours</option>
+                        <option value="Terminé">Terminé</option>
+                        <option value="Souhaits">Liste de Souhaits</option>
+                    </select>
+                    <select id="sort-by" onchange="filterCollection()" class="bg-slate-900/80 border border-slate-700/80 text-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="date-desc">Récent d'abord</option>
+                        <option value="title-asc">Nom (A-Z)</option>
+                        <option value="rating-desc">Meilleurs notes</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Games Grid -->
+            <div id="collection-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Empty State Container -->
+            <div id="collection-empty" class="hidden text-center py-16 glass-panel rounded-2xl p-8">
+                <i class="fa-solid fa-gamepad text-5xl text-slate-600 mb-4"></i>
+                <h3 class="text-xl font-bold text-slate-300">Aucun jeu dans cette vue</h3>
+                <p class="text-slate-500 text-sm mt-1 max-w-md mx-auto">Votre collection est vide ou aucun jeu ne correspond à vos filtres actuels.</p>
+                <button onclick="switchTab('explore')" class="mt-4 bg-indigo-600 text-white font-medium text-sm px-4 py-2 rounded-xl">
+                    Découvrir le catalogue
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION 2: EXPLORER & AUTOCOMPLÉTION -->
+        <section id="tab-explore" class="tab-content hidden space-y-6">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Base de Données / Explorer</h2>
+                <p class="text-slate-400 text-sm mt-1">Recherche de jeux (API IGDB/RAWG simulée & temps réel).</p>
+            </div>
+
+            <!-- Search Bar with Instant Autocomplete -->
+            <div class="relative">
+                <div class="glass-panel p-2 rounded-2xl flex items-center border border-indigo-500/30 shadow-xl focus-within:border-indigo-500 transition">
+                    <i class="fa-solid fa-magnifying-glass text-indigo-400 ml-4 mr-2 text-lg"></i>
+                    <input type="text" id="db-search-input" oninput="handleDbSearch()" placeholder="Tapez un nom de jeu (ex: Zelda, Mario, Elden Ring, GTA, Cyberpunk...)" class="w-full bg-transparent border-none text-white text-base py-3 px-2 focus:outline-none">
+                    <button onclick="handleDbSearch()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition">
+                        Chercher
+                    </button>
+                </div>
+
+                <!-- Autocomplete Dropdown List -->
+                <div id="autocomplete-list" class="hidden absolute left-0 right-0 top-full mt-2 glass-panel bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+                    <!-- Dropdown items dynamically injected -->
+                </div>
+            </div>
+
+            <!-- Filter Chips -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-2">
+                <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider mr-2">Catégories :</span>
+                <button onclick="quickFilter('all')" class="quick-chip bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap">Tout</button>
+                <button onclick="quickFilter('Action')" class="quick-chip bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap">Action/Aventure</button>
+                <button onclick="quickFilter('RPG')" class="quick-chip bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap">RPG</button>
+                <button onclick="quickFilter('Course')" class="quick-chip bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap">Course</button>
+                <button onclick="quickFilter('Incontournable')" class="quick-chip bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-full font-medium whitespace-nowrap">⭐ Tops du moment</button>
+            </div>
+
+            <!-- Database Search Results Grid -->
+            <div>
+                <h3 id="db-results-title" class="text-lg font-bold text-slate-200 mb-4">Jeux populaires & Recommandés</h3>
+                <div id="db-results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <!-- Dynamic Database Items -->
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: SCANNER DE CODE-BARRES PAR CAMÉRA -->
+        <section id="tab-scanner" class="tab-content hidden space-y-6">
+            <div class="max-w-2xl mx-auto space-y-6">
+                <div class="text-center">
+                    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Scanner de Code-Barres EAN</h2>
+                    <p class="text-slate-400 text-sm mt-1">Scannez le code au dos du boîtier pour importer instantanément le jeu.</p>
+                </div>
+
+                <!-- Camera Container -->
+                <div class="glass-panel p-4 rounded-3xl border border-slate-800 text-center relative overflow-hidden">
+                    <div id="scanner-wrapper" class="relative bg-black rounded-2xl overflow-hidden aspect-video flex flex-col items-center justify-center border border-slate-700/60">
+                        <div id="reader" class="w-full h-full"></div>
+
+                        <!-- Scanner Visual Overlay Target (When scanning is active) -->
+                        <div id="scanner-overlay" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
+                            <div class="w-64 h-36 border-2 border-indigo-400 border-dashed rounded-xl relative flex items-center justify-center bg-indigo-500/5">
+                                <div class="laser-line"></div>
+                                <div class="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-pink-500"></div>
+                                <div class="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-pink-500"></div>
+                                <div class="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-pink-500"></div>
+                                <div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-pink-500"></div>
+                            </div>
+                            <p class="text-xs text-white bg-slate-900/80 px-3 py-1 rounded-full mt-4 font-mono shadow">Alignez le code-barres dans le cadre</p>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Control Buttons -->
+                    <div class="flex flex-wrap items-center justify-center gap-3 mt-4">
+                        <button id="btn-start-scanner" onclick="startScanner()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-indigo-600/30">
+                            <i class="fa-solid fa-camera"></i> Activer la caméra
+                        </button>
+                        <button id="btn-stop-scanner" onclick="stopScanner()" class="hidden bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition flex items-center gap-2">
+                            <i class="fa-solid fa-circle-stop"></i> Arrêter la caméra
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Simulation Quick Test Barcodes -->
+                <div class="glass-panel p-5 rounded-2xl space-y-3">
+                    <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-flask"></i> Tester rapidement sans caméra (Codes EAN pré-enregistrés) :
+                    </h3>
+                    <p class="text-xs text-slate-400">Cliquez sur un exemple de jeu pour simuler la lecture d'un code-barres physique :</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                        <button onclick="simulateScan('0045496420123')" class="p-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs flex justify-between items-center transition group">
+                            <span><strong class="text-slate-200">Zelda: Breath of the Wild</strong> (Switch)</span>
+                            <span class="font-mono text-indigo-400 group-hover:underline">0045496420123</span>
+                        </button>
+                        <button onclick="simulateScan('5051889678121')" class="p-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs flex justify-between items-center transition group">
+                            <span><strong class="text-slate-200">Elden Ring</strong> (PS5)</span>
+                            <span class="font-mono text-indigo-400 group-hover:underline">5051889678121</span>
+                        </button>
+                        <button onclick="simulateScan('5055277042564')" class="p-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs flex justify-between items-center transition group">
+                            <span><strong class="text-slate-200">Cyberpunk 2077</strong> (PC/Console)</span>
+                            <span class="font-mono text-indigo-400 group-hover:underline">5055277042564</span>
+                        </button>
+                        <button onclick="simulateScan('5026555424233')" class="p-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs flex justify-between items-center transition group">
+                            <span><strong class="text-slate-200">Grand Theft Auto V</strong> (PS4/Xbox)</span>
+                            <span class="font-mono text-indigo-400 group-hover:underline">5026555424233</span>
+                        </button>
+                    </div>
+
+                    <!-- Manual EAN Input Fallback -->
+                    <div class="pt-3 border-t border-slate-800/80 flex gap-2">
+                        <input type="text" id="manual-ean-input" placeholder="Saisir un code EAN à 13 chiffres..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        <button onclick="manualEANSubmit()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition">
+                            Valider EAN
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: STATISTIQUES & TABLEAU DE BORD -->
+        <section id="tab-stats" class="tab-content hidden space-y-6">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Statistiques de Collection</h2>
+                <p class="text-slate-400 text-sm mt-1">Aperçu analytique de votre ludothèque.</p>
+            </div>
+
+            <!-- Key Indicators Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass-panel p-5 rounded-2xl border border-indigo-500/20">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Jeux</p>
+                    <p id="stat-total" class="text-3xl font-black text-white mt-1">0</p>
+                    <p class="text-[11px] text-indigo-400 mt-1"><i class="fa-solid fa-gamepad"></i> Titres enregistrés</p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-emerald-500/20">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Jeux Terminés</p>
+                    <p id="stat-completed" class="text-3xl font-black text-emerald-400 mt-1">0</p>
+                    <p class="text-[11px] text-emerald-500 mt-1"><i class="fa-solid fa-check-double"></i> Jeux complétés</p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-amber-500/20">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Note Moyenne</p>
+                    <p id="stat-rating" class="text-3xl font-black text-amber-400 mt-1">0.0</p>
+                    <p class="text-[11px] text-amber-500 mt-1"><i class="fa-solid fa-star"></i> Évaluation globale</p>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-purple-500/20">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Valeur Estimée</p>
+                    <p id="stat-value" class="text-3xl font-black text-purple-400 mt-1">0 €</p>
+                    <p class="text-[11px] text-purple-400 mt-1"><i class="fa-solid fa-vault"></i> Estimatif argus</p>
+                </div>
+            </div>
+
+            <!-- Charts Container -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="text-base font-bold text-slate-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-pie-chart text-indigo-400"></i> Répartition par Plateforme
+                    </h3>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="chart-platforms"></canvas>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="text-base font-bold text-slate-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-tasks text-pink-400"></i> Avancement & Statuts
+                    </h3>
+                    <div class="relative h-64 flex items-center justify-center">
+                        <canvas id="chart-status"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 5: PARAMÈTRES & PWA EXPORT -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Paramètres & Données</h2>
+                <p class="text-slate-400 text-sm mt-1">Sauvegardez, exportez ou installez l'application.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Data Management Panel -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h3 class="text-lg font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-database text-indigo-400"></i> Importer / Exporter mes données
+                    </h3>
+                    <p class="text-xs text-slate-400">Conservez une copie de sécurité au format JSON ou réimportez vos fichiers sur un autre appareil.</p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button onclick="exportData()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-download"></i> Exporter (JSON)
+                        </button>
+                        <label class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-sm py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer text-center">
+                            <i class="fa-solid fa-upload"></i> Importer
+                            <input type="file" id="import-file-input" onchange="importData(event)" accept=".json" class="hidden">
+                        </label>
+                    </div>
+                    
+                    <hr class="border-slate-800 my-4">
+
+                    <button onclick="confirmClearCollection()" class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i> Réinitialiser entièrement ma collection localstorage
+                    </button>
+                </div>
+
+                <!-- PWA Information & Config -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h3 class="text-lg font-bold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-mobile-screen-button text-pink-400"></i> Statut Progressive Web App
+                    </h3>
+                    <p class="text-xs text-slate-400">GameVault s'exécute directement dans le navigateur et peut être installé comme une application native sans App Store.</p>
+                    
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between p-2.5 bg-slate-900/60 rounded-xl">
+                            <span class="text-slate-400">Support PWA Browser :</span>
+                            <span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Compatible</span>
+                        </div>
+                        <div class="flex justify-between p-2.5 bg-slate-900/60 rounded-xl">
+                            <span class="text-slate-400">Stockage Local (LocalStorage) :</span>
+                            <span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Actif</span>
+                        </div>
+                        <div class="flex justify-between p-2.5 bg-slate-900/60 rounded-xl">
+                            <span class="text-slate-400">Mode Hors-Ligne (Service Worker) :</span>
+                            <span class="text-indigo-400 font-bold">Simulé / Prêt</span>
+                        </div>
+                    </div>
+
+                    <button onclick="installPWA()" class="w-full bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-sm py-3 px-4 rounded-xl transition shadow-lg">
+                        Installer l'application sur l'écran d'accueil
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL : Game Details / Edit Entry -->
+    <div id="modal-game-detail" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="glass-panel bg-slate-900/90 border border-slate-700/80 rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl animate-fade-in">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white w-8 h-8 rounded-full bg-slate-800/80 flex items-center justify-center">
+                <i class="fa-solid fa-xmark text-base"></i>
+            </button>
+
+            <div class="flex flex-col sm:flex-row gap-6">
+                <!-- Cover Image -->
+                <img id="modal-img" src="" alt="Cover" class="w-36 h-48 sm:w-44 sm:h-60 object-cover rounded-2xl mx-auto sm:mx-0 shadow-lg border border-slate-700">
+
+                <div class="flex-1 space-y-3 text-left">
+                    <span id="modal-platform" class="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        Platform
+                    </span>
+                    <h3 id="modal-title" class="text-xl font-black text-white leading-tight">Game Title</h3>
+                    <p id="modal-developer" class="text-xs text-slate-400">Éditeur / Développeur</p>
+                    <p id="modal-description" class="text-xs text-slate-300 line-clamp-4">Description...</p>
+
+                    <div class="pt-2 flex items-center gap-2 text-xs text-amber-400 font-semibold">
+                        <i class="fa-solid fa-star"></i> <span id="modal-igdb-rating">0.0</span> / 100 (IGDB)
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-800 my-5">
+
+            <!-- Collection Status & Notes Editing -->
+            <div class="space-y-4">
+                <h4 class="text-sm font-bold text-slate-200">Personnaliser dans ma collection</h4>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 font-medium mb-1">Statut d'avancement</label>
+                        <select id="modal-input-status" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <option value="Possédé">Possédé</option>
+                            <option value="En cours">En cours de jeu</option>
+                            <option value="Terminé">Terminé / Platine</option>
+                            <option value="Souhaits">Liste de Souhaits</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-400 font-medium mb-1">Ma note personnelle</label>
+                        <select id="modal-input-user-rating" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                            <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                            <option value="3">⭐⭐⭐ (3/5)</option>
+                            <option value="2">⭐⭐ (2/5)</option>
+                            <option value="1">⭐ (1/5)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-slate-400 font-medium mb-1">Prix d'achat ou notes persos (ex: "Prêté à Alex")</label>
+                    <input type="text" id="modal-input-notes" placeholder="Notes personnelles..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div class="flex items-center justify-between pt-3">
+                    <button id="modal-btn-delete" onclick="removeCurrentGame()" class="hidden text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-trash-can"></i> Retirer de la collection
+                    </button>
+                    <button id="modal-btn-save" onclick="saveGameToCollection()" class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-lg">
+                        Enregistrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION JAVASCRIPT LOGIC -->
+    <script>
+        // ==========================================
+        // 1. MOCK DATABASE (IGDB / RAWG SIMULATION & EAN MAPPING)
+        // ==========================================
+        const MOCK_DATABASE = [
+            {
+                id: 'zelda-botw',
+                ean: '0045496420123',
+                title: 'The Legend of Zelda: Breath of the Wild',
+                platform: 'Nintendo Switch',
+                genre: 'Action',
+                developer: 'Nintendo',
+                year: 2017,
+                rating: 97,
+                cover: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
+                description: 'Entrez dans un monde de découverte, d\'exploration et d\'aventure dans The Legend of Zelda: Breath of the Wild, un nouveau jeu qui brise les conventions de la série acclamée.',
+                estimatedPrice: 45
+            },
+            {
+                id: 'elden-ring',
+                ean: '5051889678121',
+                title: 'Elden Ring',
+                platform: 'PS5',
+                genre: 'RPG',
+                developer: 'FromSoftware / Bandai Namco',
+                year: 2022,
+                rating: 96,
+                cover: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80',
+                description: 'UN NOUVEL ACTION-RPG DE FANTASY. Levez-vous, Sans-éclat, et laissez-vous guider par la grâce pour arborer le pouvoir du Cercle d\'Elden et devenir le Seigneur d\'Elden.',
+                estimatedPrice: 50
+            },
+            {
+                id: 'cyberpunk-2077',
+                ean: '5055277042564',
+                title: 'Cyberpunk 2077',
+                platform: 'PC',
+                genre: 'RPG',
+                developer: 'CD Projekt Red',
+                year: 2020,
+                rating: 86,
+                cover: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80',
+                description: 'Cyberpunk 2077 est un RPG d\'action-aventure en monde ouvert qui se déroule dans la mégapole de Night City, où vous incarnez un mercenaire cyberpunk.',
+                estimatedPrice: 30
+            },
+            {
+                id: 'gta-v',
+                ean: '5026555424233',
+                title: 'Grand Theft Auto V',
+                platform: 'PS4',
+                genre: 'Action',
+                developer: 'Rockstar Games',
+                year: 2013,
+                rating: 97,
+                cover: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=80',
+                description: 'Lorsqu\'un jeune arnaqueur, un braqueur de banque à la retraite et un psychopathe terrifiant se retrouvent enchevêtrés, ils doivent combiner leurs forces.',
+                estimatedPrice: 20
+            },
+            {
+                id: 'mario-odyssey',
+                ean: '0045496420895',
+                title: 'Super Mario Odyssey',
+                platform: 'Nintendo Switch',
+                genre: 'Action',
+                developer: 'Nintendo',
+                year: 2017,
+                rating: 97,
+                cover: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?auto=format&fit=crop&w=400&q=80',
+                description: 'Rejoignez Mario dans une immense aventure en 3D à travers le monde et utilisez ses incroyables nouvelles capacités pour sauver la princesse Peach.',
+                estimatedPrice: 40
+            },
+            {
+                id: 'god-of-war-rag',
+                ean: '0711719548485',
+                title: 'God of War Ragnarök',
+                platform: 'PS5',
+                genre: 'Action',
+                developer: 'Santa Monica Studio',
+                year: 2022,
+                rating: 94,
+                cover: 'https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=400&q=80',
+                description: 'Kratos et Atreus s\'aventurent dans chacun des Neuf Royaumes à la recherche de réponses alors que les forces d\'Asgard se préparent à la bataille prophétisée.',
+                estimatedPrice: 55
+            },
+            {
+                id: 'forza-horizon-5',
+                ean: '0889842880008',
+                title: 'Forza Horizon 5',
+                platform: 'Xbox Series X/S',
+                genre: 'Course',
+                developer: 'Playground Games',
+                year: 2021,
+                rating: 92,
+                cover: 'https://images.unsplash.com/photo-1547394765-185e1e68f34e?auto=format&fit=crop&w=400&q=80',
+                description: 'Votre aventure Horizon ultime vous attend ! Explorez les paysages vibrants et en constante évolution du Mexique.',
+                estimatedPrice: 35
+            },
+            {
+                id: 'pokemon-scarlet',
+                ean: '0045496508319',
+                title: 'Pokémon Écarlate',
+                platform: 'Nintendo Switch',
+                genre: 'RPG',
+                developer: 'Game Freak',
+                year: 2022,
+                rating: 72,
+                cover: 'https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?auto=format&fit=crop&w=400&q=80',
+                description: 'Capturez, combattez et entraînez des Pokémon dans la région de Paldéa, une vaste zone remplie de lacs, de pics d\'altitude, de terres arides.',
+                estimatedPrice: 45
+            }
+        ];
+
+        // ==========================================
+        // 2. STATE MANAGEMENT & INITIALIZATION
+        // ==========================================
+        let myCollection = JSON.parse(localStorage.getItem('gamevault_collection') || '[]');
+        let activeTab = 'collection';
+        let currentSelectedGame = null;
+        let html5QrCodeScanner = null;
+        let chartPlatformsInstance = null;
+        let chartStatusInstance = null;
+
+        window.onload = function() {
+            // Load Initial Views
+            renderCollection();
+            renderDbResults(MOCK_DATABASE);
+            updateBadgesAndStats();
+            initPWA();
+        };
+
+        // Switch Navigation Tabs
+        function switchTab(tabId) {
+            activeTab = tabId;
+
+            // Stop camera if leaving scanner
+            if (tabId !== 'scanner') {
+                stopScanner();
+            }
+
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected tab content
+            const targetTab = document.getElementById('tab-' + tabId);
+            if (targetTab) targetTab.classList.remove('hidden');
+
+            // Update Desktop Nav styles
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-indigo-400', 'bg-indigo-500/10', 'border', 'border-indigo-500/20');
+                btn.classList.add('text-slate-400');
+            });
+            const activeDesktopNav = document.getElementById('nav-' + tabId);
+            if (activeDesktopNav) {
+                activeDesktopNav.classList.remove('text-slate-400');
+                activeDesktopNav.classList.add('text-indigo-400', 'bg-indigo-500/10', 'border', 'border-indigo-500/20');
+            }
+
+            // Update Mobile Nav styles
+            document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+                btn.classList.remove('text-indigo-400');
+                btn.classList.add('text-slate-400');
+            });
+            const activeMobileNav = document.getElementById('mobile-nav-' + tabId);
+            if (activeMobileNav) {
+                activeMobileNav.classList.remove('text-slate-400');
+                activeMobileNav.classList.add('text-indigo-400');
+            }
+
+            // Tab-specific triggers
+            if (tabId === 'stats') {
+                renderCharts();
+            }
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-800 border-indigo-500 text-indigo-300';
+            if (type === 'success') bgClass = 'bg-slate-800 border-emerald-500 text-emerald-300';
+            if (type === 'error') bgClass = 'bg-slate-800 border-rose-500 text-rose-300';
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl text-xs font-semibold ${bgClass} transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `
+                <i class="fa-solid ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} text-base"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Save Collection to LocalStorage
+        function saveCollectionToStorage() {
+            localStorage.setItem('gamevault_collection', JSON.stringify(myCollection));
+            updateBadgesAndStats();
+        }
+
+        function updateBadgesAndStats() {
+            document.getElementById('badge-count').innerText = myCollection.length;
+            document.getElementById('stat-total').innerText = myCollection.length;
+            
+            const completedCount = myCollection.filter(g => g.userStatus === 'Terminé').length;
+            document.getElementById('stat-completed').innerText = completedCount;
+
+            const sumRating = myCollection.reduce((acc, g) => acc + (parseInt(g.userRating) || 0), 0);
+            const avgRating = myCollection.length ? (sumRating / myCollection.length).toFixed(1) : '0.0';
+            document.getElementById('stat-rating').innerText = avgRating + ' / 5';
+
+            const totalValue = myCollection.reduce((acc, g) => acc + (g.estimatedPrice || 30), 0);
+            document.getElementById('stat-value').innerText = totalValue + ' €';
+        }
+
+        // ==========================================
+        // 3. COLLECTION RENDER & FILTERING
+        // ==========================================
+        function renderCollection() {
+            const grid = document.getElementById('collection-grid');
+            const emptyState = document.getElementById('collection-empty');
+            
+            const searchVal = document.getElementById('collection-search').value.toLowerCase();
+            const platformVal = document.getElementById('filter-platform').value;
+            const statusVal = document.getElementById('filter-status').value;
+            const sortVal = document.getElementById('sort-by').value;
+
+            let filtered = myCollection.filter(game => {
+                const matchesSearch = game.title.toLowerCase().includes(searchVal) || game.developer.toLowerCase().includes(searchVal);
+                const matchesPlatform = platformVal === 'ALL' || game.platform === platformVal;
+                const matchesStatus = statusVal === 'ALL' || game.userStatus === statusVal;
+                return matchesSearch && matchesPlatform && matchesStatus;
+            });
+
+            // Sorting
+            filtered.sort((a, b) => {
+                if (sortVal === 'title-asc') return a.title.localeCompare(b.title);
+                if (sortVal === 'rating-desc') return (b.userRating || 0) - (a.userRating || 0);
+                return new Date(b.addedAt || 0) - new Date(a.addedAt || 0); // date-desc
+            });
+
+            grid.innerHTML = '';
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                grid.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                grid.classList.remove('hidden');
+
+                filtered.forEach(game => {
+                    const card = document.createElement('div');
+                    card.className = 'glass-card rounded-2xl overflow-hidden cursor-pointer flex flex-col group';
+                    card.onclick = () => openGameModal(game, true);
+
+                    let statusBadgeClass = 'bg-indigo-500/20 text-indigo-300';
+                    if (game.userStatus === 'Terminé') statusBadgeClass = 'bg-emerald-500/20 text-emerald-300';
+                    if (game.userStatus === 'En cours') statusBadgeClass = 'bg-amber-500/20 text-amber-300';
+                    if (game.userStatus === 'Souhaits') statusBadgeClass = 'bg-pink-500/20 text-pink-300';
+
+                    card.innerHTML = `
+                        <div class="relative aspect-[3/4] overflow-hidden bg-slate-900">
+                            <img src="${game.cover}" alt="${game.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                            <span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadgeClass} backdrop-blur-md">
+                                ${game.userStatus || 'Possédé'}
+                            </span>
+                        </div>
+                        <div class="p-3 flex-1 flex flex-col justify-between space-y-2">
+                            <div>
+                                <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider truncate">${game.platform}</p>
+                                <h4 class="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition">${game.title}</h4>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-400">
+                                <span>${'⭐'.repeat(game.userRating || 5)}</span>
+                                <span class="font-mono text-slate-300">${game.estimatedPrice || 30}€</span>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+        }
+
+        function filterCollection() {
+            renderCollection();
+        }
+
+        // ==========================================
+        // 4. EXPLORE & SEARCH API SIMULATION
+        // ==========================================
+        function handleDbSearch() {
+            const query = document.getElementById('db-search-input').value.toLowerCase().trim();
+            const autocompleteList = document.getElementById('autocomplete-list');
+
+            if (!query) {
+                autocompleteList.classList.add('hidden');
+                renderDbResults(MOCK_DATABASE);
+                document.getElementById('db-results-title').innerText = 'Jeux populaires & Recommandés';
+                return;
+            }
+
+            const results = MOCK_DATABASE.filter(g => 
+                g.title.toLowerCase().includes(query) || 
+                g.developer.toLowerCase().includes(query) ||
+                g.platform.toLowerCase().includes(query)
+            );
+
+            // Populate Autocomplete Dropdown
+            if (results.length > 0) {
+                autocompleteList.innerHTML = results.slice(0, 5).map(g => `
+                    <div onclick="selectAutocompleteItem('${g.id}')" class="p-3 hover:bg-indigo-600/20 border-b border-slate-800/60 cursor-pointer flex items-center gap-3 transition">
+                        <img src="${g.cover}" class="w-8 h-10 object-cover rounded-lg">
+                        <div>
+                            <p class="text-xs font-bold text-white">${g.title}</p>
+                            <p class="text-[10px] text-indigo-400">${g.platform} • ${g.developer}</p>
+                        </div>
+                    </div>
+                `).join('');
+                autocompleteList.classList.remove('hidden');
+            } else {
+                autocompleteList.classList.add('hidden');
+            }
+
+            renderDbResults(results);
+            document.getElementById('db-results-title').innerText = `Résultats pour "${query}" (${results.length})`;
+        }
+
+        function selectAutocompleteItem(gameId) {
+            const game = MOCK_DATABASE.find(g => g.id === gameId);
+            document.getElementById('autocomplete-list').classList.add('hidden');
+            if (game) openGameModal(game, false);
+        }
+
+        function quickFilter(genre) {
+            document.querySelectorAll('.quick-chip').forEach(btn => {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-slate-800', 'text-slate-300');
+            });
+            event.target.classList.remove('bg-slate-800', 'text-slate-300');
+            event.target.classList.add('bg-indigo-600', 'text-white');
+
+            if (genre === 'all') {
+                renderDbResults(MOCK_DATABASE);
+            } else if (genre === 'Incontournable') {
+                renderDbResults(MOCK_DATABASE.filter(g => g.rating >= 95));
+            } else {
+                renderDbResults(MOCK_DATABASE.filter(g => g.genre === genre));
+            }
+        }
+
+        function renderDbResults(items) {
+            const grid = document.getElementById('db-results-grid');
+            grid.innerHTML = '';
+
+            if (items.length === 0) {
+                grid.innerHTML = '<p class="col-span-full text-slate-500 text-sm py-8 text-center">Aucun jeu correspondant trouvé dans la base de données.</p>';
+                return;
+            }
+
+            items.forEach(game => {
+                const inCollection = myCollection.some(g => g.id === game.id);
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-2xl overflow-hidden cursor-pointer flex flex-col group';
+                card.onclick = () => openGameModal(game, inCollection);
+
+                card.innerHTML = `
+                    <div class="relative aspect-[3/4] overflow-hidden bg-slate-900">
+                        <img src="${game.cover}" alt="${game.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        ${inCollection ? '<span class="absolute top-2 right-2 bg-emerald-500/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md"><i class="fa-solid fa-check"></i> Dans le Vault</span>' : ''}
+                    </div>
+                    <div class="p-3 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                            <p class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider truncate">${game.platform}</p>
+                            <h4 class="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition">${game.title}</h4>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">${game.year}</span>
+                            <span class="text-amber-400 font-bold"><i class="fa-solid fa-star text-[10px]"></i> ${game.rating}</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        // 5. CAMERA & BARCODE SCANNER LOGIC
+        // ==========================================
+        function startScanner() {
+            document.getElementById('btn-start-scanner').classList.add('hidden');
+            document.getElementById('btn-stop-scanner').classList.remove('hidden');
+
+            try {
+                html5QrCodeScanner = new Html5Qrcode("reader");
+                const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+                
+                html5QrCodeScanner.start(
+                    { facingMode: "environment" }, 
+                    config, 
+                    onScanSuccess, 
+                    onScanFailure
+                ).catch(err => {
+                    showToast("Impossible d'accéder à la caméra: " + err, "error");
+                    stopScanner();
+                });
+            } catch(e) {
+                showToast("Erreur d'initialisation du scanner", "error");
+                stopScanner();
+            }
+        }
+
+        function stopScanner() {
+            if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().then(() => {
+                    html5QrCodeScanner.clear();
+                    html5QrCodeScanner = null;
+                }).catch(() => {});
+            }
+            document.getElementById('btn-start-scanner').classList.remove('hidden');
+            document.getElementById('btn-stop-scanner').classList.add('hidden');
+        }
+
+        function onScanSuccess(decodedText) {
+            stopScanner();
+            processEANCode(decodedText);
+        }
+
+        function onScanFailure(error) {
+            // Keep scanning quietly
+        }
+
+        function simulateScan(ean) {
+            processEANCode(ean);
+        }
+
+        function manualEANSubmit() {
+            const ean = document.getElementById('manual-ean-input').value.trim();
+            if (ean) {
+                processEANCode(ean);
+            } else {
+                showToast("Veuillez entrer un code EAN valide", "error");
+            }
+        }
+
+        function processEANCode(eanCode) {
+            showToast(`Code EAN Détecté: ${eanCode}`, "info");
+
+            // Look up in mock database
+            const foundGame = MOCK_DATABASE.find(g => g.ean === eanCode);
+
+            if (foundGame) {
+                showToast(`Jeu identifié : ${foundGame.title}`, "success");
+                const inCollection = myCollection.some(g => g.id === foundGame.id);
+                openGameModal(foundGame, inCollection);
+            } else {
+                showToast("Aucun jeu correspondant dans l'index EAN. Création d'une fiche...", "error");
+                // Create custom game placeholder for unknown EAN
+                const customGame = {
+                    id: 'custom-' + Date.now(),
+                    ean: eanCode,
+                    title: `Jeu Inconnu (EAN ${eanCode})`,
+                    platform: 'Multiplateforme',
+                    genre: 'Divers',
+                    developer: 'Éditeur Inconnu',
+                    year: new Date().getFullYear(),
+                    rating: 80,
+                    cover: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
+                    description: 'Jeu ajouté manuellement par code-barres.',
+                    estimatedPrice: 30
+                };
+                openGameModal(customGame, false);
+            }
+        }
+
+        // ==========================================
+        // 6. MODAL & GAME EDITION
+        // ==========================================
+        function openGameModal(game, isAlreadyInCollection = false) {
+            currentSelectedGame = game;
+
+            document.getElementById('modal-img').src = game.cover;
+            document.getElementById('modal-title').innerText = game.title;
+            document.getElementById('modal-platform').innerText = game.platform;
+            document.getElementById('modal-developer').innerText = `${game.developer} • ${game.year}`;
+            document.getElementById('modal-description').innerText = game.description;
+            document.getElementById('modal-igdb-rating').innerText = game.rating;
+
+            // Existing item vs new item logic
+            const existingEntry = myCollection.find(g => g.id === game.id);
+
+            if (existingEntry) {
+                document.getElementById('modal-input-status').value = existingEntry.userStatus || 'Possédé';
+                document.getElementById('modal-input-user-rating').value = existingEntry.userRating || '5';
+                document.getElementById('modal-input-notes').value = existingEntry.notes || '';
+                document.getElementById('modal-btn-delete').classList.remove('hidden');
+                document.getElementById('modal-btn-save').innerText = 'Mettre à jour';
+            } else {
+                document.getElementById('modal-input-status').value = 'Possédé';
+                document.getElementById('modal-input-user-rating').value = '5';
+                document.getElementById('modal-input-notes').value = '';
+                document.getElementById('modal-btn-delete').classList.add('hidden');
+                document.getElementById('modal-btn-save').innerText = 'Ajouter au Vault';
+            }
+
+            document.getElementById('modal-game-detail').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-game-detail').classList.add('hidden');
+            currentSelectedGame = null;
+        }
+
+        function saveGameToCollection() {
+            if (!currentSelectedGame) return;
+
+            const userStatus = document.getElementById('modal-input-status').value;
+            const userRating = document.getElementById('modal-input-user-rating').value;
+            const notes = document.getElementById('modal-input-notes').value;
+
+            const existingIndex = myCollection.findIndex(g => g.id === currentSelectedGame.id);
+
+            const updatedGame = {
+                ...currentSelectedGame,
+                userStatus: userStatus,
+                userRating: userRating,
+                notes: notes,
+                addedAt: existingIndex >= 0 ? myCollection[existingIndex].addedAt : new Date().toISOString()
+            };
+
+            if (existingIndex >= 0) {
+                myCollection[existingIndex] = updatedGame;
+                showToast(`"${updatedGame.title}" mis à jour !`, 'success');
+            } else {
+                myCollection.push(updatedGame);
+                showToast(`"${updatedGame.title}" ajouté à votre collection !`, 'success');
+            }
+
+            saveCollectionToStorage();
+            renderCollection();
+            closeModal();
+        }
+
+        function removeCurrentGame() {
+            if (!currentSelectedGame) return;
+
+            myCollection = myCollection.filter(g => g.id !== currentSelectedGame.id);
+            saveCollectionToStorage();
+            renderCollection();
+            closeModal();
+            showToast("Jeu retiré de votre collection", "info");
+        }
+
+        // ==========================================
+        // 7. CHART.JS ANALYTICS & STATS
+        // ==========================================
+        function renderCharts() {
+            // Platform Distribution Chart
+            const platformsMap = {};
+            myCollection.forEach(g => {
+                platformsMap[g.platform] = (platformsMap[g.platform] || 0) + 1;
+            });
+
+            const ctxPlatforms = document.getElementById('chart-platforms').getContext('2d');
+            if (chartPlatformsInstance) chartPlatformsInstance.destroy();
+
+            chartPlatformsInstance = new Chart(ctxPlatforms, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(platformsMap).length ? Object.keys(platformsMap) : ['Aucun jeu'],
+                    datasets: [{
+                        data: Object.values(platformsMap).length ? Object.values(platformsMap) : [1],
+                        backgroundColor: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#3b82f6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Inter', size: 11 } } }
+                    }
+                }
+            });
+
+            // Status Chart
+            const statusMap = { 'Possédé': 0, 'En cours': 0, 'Terminé': 0, 'Souhaits': 0 };
+            myCollection.forEach(g => {
+                const s = g.userStatus || 'Possédé';
+                statusMap[s] = (statusMap[s] || 0) + 1;
+            });
+
+            const ctxStatus = document.getElementById('chart-status').getContext('2d');
+            if (chartStatusInstance) chartStatusInstance.destroy();
+
+            chartStatusInstance = new Chart(ctxStatus, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(statusMap),
+                    datasets: [{
+                        label: 'Nombre de jeux',
+                        data: Object.values(statusMap),
+                        backgroundColor: ['#6366f1', '#f59e0b', '#10b981', '#ec4899'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // ==========================================
+        // 8. DATA IMPORT / EXPORT & PWA MANAGEMENT
+        // ==========================================
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(myCollection, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `gamevault_export_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Export JSON téléchargé avec succès !", "success");
+        }
+
+        function importData(event) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        myCollection = imported;
+                        saveCollectionToStorage();
+                        renderCollection();
+                        showToast(`${imported.length} jeux importés avec succès !`, "success");
+                    } else {
+                        showToast("Format de fichier JSON invalide", "error");
+                    }
+                } catch(err) {
+                    showToast("Erreur lors de la lecture du fichier JSON", "error");
+                }
+            };
+            if (event.target.files[0]) {
+                fileReader.readAsText(event.target.files[0]);
+            }
+        }
+
+        function confirmClearCollection() {
+            if (confirm("Êtes-vous sûr de vouloir supprimer tous les jeux de votre collection ? Cette action est irrreversible.")) {
+                myCollection = [];
+                saveCollectionToStorage();
+                renderCollection();
+                showToast("Collection réinitialisée", "info");
+            }
+        }
+
+        // Dynamic Manifest & PWA Installation Logic
+        let deferredPrompt;
+
+        function initPWA() {
+            // Generate Dynamic Manifest
+            const manifest = {
+                name: "GameVault PWA",
+                short_name: "GameVault",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#0b0f19",
+                theme_color: "#4f46e5",
+                icons: [
+                    {
+                        src: "https://placehold.co/192x192/4f46e5/ffffff?text=GameVault",
+                        sizes: "192x192",
+                        type: "image/png"
+                    },
+                    {
+                        src: "https://placehold.co/512x512/4f46e5/ffffff?text=GameVault",
+                        sizes: "512x512",
+                        type: "image/png"
+                    }
+                ]
+            };
+
+            const stringManifest = JSON.stringify(manifest);
+            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestURL;
+            document.head.appendChild(link);
+
+            // Register Mock Service Worker
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', (e) => self.skipWaiting());
+                    self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => new Response("Hors ligne"))));
+                `;
+                const blobSW = new Blob([swCode], { type: 'application/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(blobSW)).catch(() => {});
+            }
+
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+            });
+        }
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        showToast("GameVault a été ajouté à votre écran d'accueil !", "success");
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                showToast("Pour installer : Touchez le menu 'Partager' de votre navigateur puis 'Sur l'écran d'accueil'.", "info");
+            }
+        }
+    </script>
+</body>
+</html>
